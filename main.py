@@ -5,11 +5,12 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
+
 @register(
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.0.3",
+    "1.0.4",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -23,7 +24,7 @@ class CS2StatusPlugin(Star):
             user=self.config.get("db_user", "root"),
             password=self.config.get("db_pass", ""),
             database=self.config.get("db_name", "cs2_serverlist"),
-            connect_timeout=5
+            connect_timeout=5,
         )
 
     @filter.command("servers")
@@ -37,7 +38,7 @@ class CS2StatusPlugin(Star):
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("数据库中没有已启用的服务器配置。")
+                yield event.plain_result("数据库中没有已启用的服务器配置")
                 return
 
             # 2. 并行查询 A2S 接口
@@ -49,8 +50,8 @@ class CS2StatusPlugin(Star):
             total_players = 0
 
             for res in results:
-                group = res['group']
-                total_players += res['player_count']
+                group = res["group"]
+                total_players += res["player_count"]
                 if group not in grouped_data:
                     grouped_data[group] = []
                 grouped_data[group].append(res)
@@ -60,9 +61,9 @@ class CS2StatusPlugin(Star):
             for group_name in sorted(grouped_data.keys(), reverse=True):
                 output.append(f"↓ {group_name} ↓")
 
-                for index, res in enumerate(grouped_data[group_name], 1):
-                    # 采用简洁排版，适合 QQ 显示
-                    output.append(f"#{index} {res['line']}")
+                for res in grouped_data[group_name]:
+                    # 这里直接用 res['line']，不再手动加 #{index}
+                    output.append(res["line"])
 
                 output.append("")  # 组间空行
 
@@ -71,7 +72,7 @@ class CS2StatusPlugin(Star):
             yield event.plain_result("\n".join(output))
 
         except Exception as e:
-            logger.error(f"CS2 Status 运行报错: {e}")
+            logger.error(f"运行报错: {e}")
             yield event.plain_result(f"查询出错: {str(e)}")
 
     def _fetch_server_list(self):
@@ -81,7 +82,8 @@ class CS2StatusPlugin(Star):
             conn = self._get_db_conn()
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
-                "SELECT name, host, port, group_name FROM servers WHERE is_active = 1 ORDER BY group_name DESC")
+                "SELECT name, host, port, group_name FROM servers WHERE is_active = 1 ORDER BY group_name DESC"
+            )
             rows = cursor.fetchall()
             cursor.close()
             return rows
@@ -91,8 +93,8 @@ class CS2StatusPlugin(Star):
 
     async def _query_a2s(self, s):
         """异步查询单个服务器 (简洁版)"""
-        host, port = s['host'], s['port']
-        name, group = s['name'], s['group_name']
+        host, port = s["host"], s["port"]
+        name, group = s["name"], s["group_name"]
         try:
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
@@ -104,4 +106,4 @@ class CS2StatusPlugin(Star):
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
-        logger.info("CS2 服务器查询插件已卸载")
+        logger.info("服务器查询插件已卸载")
