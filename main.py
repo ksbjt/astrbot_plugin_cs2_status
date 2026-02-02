@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.0.7",
+    "1.0.8",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -27,18 +27,18 @@ class CS2StatusPlugin(Star):
             connect_timeout=5,
         )
 
-    @filter.command("sl")
+    @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
-        """查询开水服列表信息"""
+        """查询开水服务器信息"""
 
-        yield event.plain_result("正在查询服务器实时状态")
+        yield event.plain_result("正在查询服务器信息")
 
         try:
             # 1. 异步获取数据库服务器列表
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("数据库中没有已启用的服务器配置")
+                yield event.plain_result("数据库中没有启用的配置")
                 return
 
             # 2. 并行查询 A2S 接口
@@ -62,7 +62,6 @@ class CS2StatusPlugin(Star):
                 output.append(f"↓ {group_name} ↓")
 
                 for res in grouped_data[group_name]:
-                    # 这里直接用 res['line']，不再手动加 #{index}
                     output.append(res["line"])
 
                 output.append("")  # 组间空行
@@ -76,7 +75,6 @@ class CS2StatusPlugin(Star):
             yield event.plain_result(f"查询出错: {str(e)}")
 
     def _fetch_server_list(self):
-        """从数据库读取列表"""
         conn = None
         try:
             conn = self._get_db_conn()
@@ -92,7 +90,6 @@ class CS2StatusPlugin(Star):
                 conn.close()
 
     async def _query_a2s(self, s):
-        """异步查询单个服务器 (简洁版)"""
         host, port = s["host"], s["port"]
         name, group = s["name"], s["group_name"]
         try:
@@ -106,4 +103,4 @@ class CS2StatusPlugin(Star):
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
-        logger.info("服务器查询插件已卸载")
+        logger.info("已卸载: astrbot_plugin_cs2_status")
