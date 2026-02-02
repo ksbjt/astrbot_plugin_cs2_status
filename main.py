@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.0.6",
+    "1.0.7",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -18,7 +18,6 @@ class CS2StatusPlugin(Star):
         self.config = config if config else context.config
 
     def _get_db_conn(self):
-        """建立数据库连接"""
         return mysql.connector.connect(
             host=self.config.get("db_host", "127.0.0.1"),
             port=int(self.config.get("db_port", 3306)),
@@ -28,26 +27,22 @@ class CS2StatusPlugin(Star):
             connect_timeout=5,
         )
 
-    @filter.command("servers")
+    @filter.command("sl")
     async def server_status(self, event: AstrMessageEvent):
         """查询开水服列表信息"""
 
-        # 修正：直接访问 event.platform 属性
-        platform_name = getattr(event, "platform", "").lower()
-        is_rich_platform = platform_name in ["discord", "kook", "telegram", "ai_vocational"]
-
-        yield event.plain_result("正在同步数据库并查询服务器状态...")
+        yield event.plain_result("正在查询服务器实时状态")
 
         try:
             # 1. 异步获取数据库服务器列表
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("❌ 数据库中没有已启用的服务器配置")
+                yield event.plain_result("数据库中没有已启用的服务器配置")
                 return
 
             # 2. 并行查询 A2S 接口
-            tasks = [self._query_a2s(s, is_rich_platform) for s in rows]
+            tasks = [self._query_a2s(s) for s in rows]
             results = await asyncio.gather(*tasks)
 
             # 3. 按组组织数据
@@ -63,30 +58,22 @@ class CS2StatusPlugin(Star):
 
             # 4. 构建输出消息
             output = []
-
-            # 如果是 Discord 等平台，加个标题
-            if is_rich_platform:
-                output.append("📊 **CS2 服务器实时状态**\n")
-
             for group_name in sorted(grouped_data.keys(), reverse=True):
                 output.append(f"↓ {group_name} ↓")
 
                 for res in grouped_data[group_name]:
+                    # 这里直接用 res['line']，不再手动加 #{index}
                     output.append(res["line"])
 
                 output.append("")  # 组间空行
 
-            # 底部统计信息
-            if is_rich_platform:
-                output.append(f"👥 **当前总计在线**: `{total_players}` 人")
-            else:
-                output.append(f"总在线人数: {total_players}")
+            output.append(f"总在线人数: {total_players}")
 
             yield event.plain_result("\n".join(output))
 
         except Exception as e:
-            logger.error(f"CS2 Status 运行报错: {e}")
-            yield event.plain_result(f"❌ 查询出错: {str(e)}")
+            logger.error(f"运行报错: {e}")
+            yield event.plain_result(f"查询出错: {str(e)}")
 
     def _fetch_server_list(self):
         """从数据库读取列表"""
@@ -104,29 +91,18 @@ class CS2StatusPlugin(Star):
             if conn and conn.is_connected():
                 conn.close()
 
-    async def _query_a2s(self, s, is_rich_platform: bool):
-        """异步查询单个服务器，根据平台生成对应格式的行"""
+    async def _query_a2s(self, s):
+        """异步查询单个服务器 (简洁版)"""
         host, port = s["host"], s["port"]
         name, group = s["name"], s["group_name"]
-
         try:
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-
-            if is_rich_platform:
-                # Discord 等富文本平台：带加粗、代码块和层级符号
-                line = f"**{name}** | `{info.map_name}`\n└ ({info.player_count}/{info.max_players}) `{host}:{port}`"
-            else:
-                # QQ/微信等纯文本平台：简单整洁
-                line = f"{name} |=> {info.map_name}\n({info.player_count} / {info.max_players}) {host}:{port}"
-
+            # 简洁格式：名称 |=> 地图 (人数/上限) IP:端口
+            line = f"{name} |=> {info.map_name}\n({info.player_count} / {info.max_players}) {host}:{port}"
             return {"group": group, "line": line, "player_count": info.player_count}
-
         except Exception:
-            if is_rich_platform:
-                line = f"**{name}** | `查询超时`\n└ (0/0) `{host}:{port}`"
-            else:
-                line = f"{name} |=> 查询超时\n(0 / 0) {host}:{port}"
+            line = f"{name} |=> 查询超时\n(0 / 0) {host}:{port}"
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
