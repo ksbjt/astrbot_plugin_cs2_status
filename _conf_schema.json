@@ -7,7 +7,7 @@
     },
     "db_port": {
         "description": "数据库端口",
-        "type": "number",
+        "type": "int",
         "default": 3306
     },
     "db_user": {

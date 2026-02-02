@@ -5,7 +5,6 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-
 @register(
     "astrbot_plugin_cs2_status",
     "ksbjt",
@@ -13,16 +12,16 @@ from astrbot.api import logger
     "1.0.0",
 )
 class CS2StatusPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: dict):
         super().__init__(context)
-        # 从 context.config 获取配置
-        self.config = context.config
+        # 优先使用 AstrBot 注入的 config 字典
+        self.config = config if config else context.config
 
     def get_db_conn(self):
         """建立数据库连接"""
         return mysql.connector.connect(
             host=self.config.get("db_host", "127.0.0.1"),
-            port=self.config.get("db_port", 3306),
+            port=int(self.config.get("db_port", 3306)),
             user=self.config.get("db_user", "root"),
             password=self.config.get("db_pass", ""),
             database=self.config.get("db_name", "cs2_servers"),
@@ -36,12 +35,11 @@ class CS2StatusPlugin(Star):
         yield event.plain_result("正在同步数据库并查询服务器状态...")
 
         try:
-            # 1. 获取数据库连接并查询
-            # 使用 asyncio.to_thread 包装数据库和网络 IO 操作
+            # 1. 获取数据库连接并查询列表
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("数据库中没有已启用的服务器配置")
+                yield event.plain_result("数据库中没有已启用的服务器配置。")
                 return
 
             # 2. 并行查询 A2S 接口 (提高效率)
@@ -59,11 +57,12 @@ class CS2StatusPlugin(Star):
                     grouped_data[group] = []
                 grouped_data[group].append(res['line'])
 
-            # 4. 构建输出
+            # 4. 构建输出消息
             output = ["**CS2 服务器实时状态**\n"]
-            for group_name, blocks in grouped_data.items():
-                output.append(f"🔹 **{group_name}**")
-                output.extend(blocks)
+            # 按组名排序显示
+            for group_name in sorted(grouped_data.keys(), reverse=True):
+                output.append(f"**{group_name}**")
+                output.extend(grouped_data[group_name])
                 output.append("")
 
             output.append(f"━━━━━━━━━━━━━━")
@@ -90,10 +89,12 @@ class CS2StatusPlugin(Star):
         host, port = s['host'], s['port']
         name, group = s['name'], s['group_name']
         try:
+            # 使用 asyncio.to_thread 包装同步阻塞的 a2s 查询
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-            line = f"**{name}** | `{info.map_name}`\n└ 👥 ({info.player_count}/{info.max_players}) `{host}:{port}`"
+            line = f"**{name}** | `{info.map_name}`\n└ ( {info.player_count} / {info.max_players} ) `{host}:{port}`"
             return {"group": group, "line": line, "player_count": info.player_count}
-        except:
+        except Exception:
+            # 捕获 A2S 查询超时或连接失败
             line = f"**{name}**\n└ (查询超时) `{host}:{port}`"
             return {"group": group, "line": line, "player_count": 0}
 
