@@ -1,29 +1,32 @@
 {
     "db_host": {
-        "description": "数据库地址",
+        "description": "地址",
         "type": "string",
         "default": "127.0.0.1",
-        "hint": "MySQL 数据库的 IP 地址"
+        "hint": "请填写数据库地址"
     },
     "db_port": {
-        "description": "数据库端口",
+        "description": "端口",
         "type": "int",
-        "default": 3306
+        "default": 3306,
+        "hint": "请填写数据库端口"
     },
     "db_user": {
-        "description": "用户名",
+        "description": "用户",
         "type": "string",
-        "default": "root"
+        "default": "root",
+        "hint": "请填写数据库用户"
     },
     "db_pass": {
         "description": "密码",
         "type": "string",
         "default": "",
-        "hint": "数据库登录密码"
+        "hint": "请填写数据库密码"
     },
     "db_name": {
-        "description": "数据库名称",
+        "description": "名称",
         "type": "string",
-        "default": "cs2_serverlist"
+        "default": "cs2_serverlist",
+        "hint": "请填写数据库名称"
     }
 }
