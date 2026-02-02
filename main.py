@@ -9,8 +9,8 @@ from astrbot.api import logger
 @register(
     "astrbot_plugin_cs2_status",
     "ksbjt",
-    "查询 CS2 服务器实时信息，支持多平台格式适配",
-    "1.0.5",
+    "查询 CS2 服务器信息",
+    "1.0.6",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -32,9 +32,9 @@ class CS2StatusPlugin(Star):
     async def server_status(self, event: AstrMessageEvent):
         """查询开水服列表信息"""
 
-        # 平台识别：判断是否支持 Markdown 格式
-        platform = event.get_platform()
-        is_rich_platform = platform in ["discord", "kook", "telegram", "ai_vocational"]
+        # 修正：直接访问 event.platform 属性
+        platform_name = getattr(event, "platform", "").lower()
+        is_rich_platform = platform_name in ["discord", "kook", "telegram", "ai_vocational"]
 
         yield event.plain_result("正在同步数据库并查询服务器状态...")
 
@@ -72,7 +72,6 @@ class CS2StatusPlugin(Star):
                 output.append(f"↓ {group_name} ↓")
 
                 for res in grouped_data[group_name]:
-                    # 直接使用 res['line']，避免编号重复
                     output.append(res["line"])
 
                 output.append("")  # 组间空行
