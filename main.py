@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.0.9",
+    "1.1.0",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -29,16 +29,22 @@ class CS2StatusPlugin(Star):
 
     @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
-        """查询开水服务器信息"""
+        """Query Kep server information"""
 
-        yield event.plain_result("正在查询服务器信息")
+        yield event.plain_result("Querying server information...")
+
+        # 定义名字映射表
+        GROUP_MAP = {
+            "ze_practice": "**__Single player practice map__**",
+            "ze": "**__Play the map (No practice stripper)__**"
+        }
 
         try:
             # 1. 异步获取数据库服务器列表
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("数据库中没有启用的配置")
+                yield event.plain_result("No enabled configuration in the database")
                 return
 
             # 2. 并行查询 A2S 接口
@@ -58,21 +64,24 @@ class CS2StatusPlugin(Star):
 
             # 4. 构建输出消息
             output = []
-            for group_name in sorted(grouped_data.keys(), reverse=True):
-                output.append(f"↓ {group_name} ↓")
+            # 按照数据库原始 group_name 排序，但在显示时转换名称
+            for group_key in sorted(grouped_data.keys(), reverse=True):
+                # --- 修改部分：转换显示名称 ---
+                display_name = GROUP_MAP.get(group_key, group_key)
+                output.append(f"↓ {display_name} ↓")
+                # ---------------------------
 
-                for res in grouped_data[group_name]:
+                for res in grouped_data[group_key]:
                     output.append(res["line"])
 
-                output.append("")  # 组间空行
+                output.append("")
 
-            output.append(f"总在线人数: `{total_players}`")
-
+            output.append(f"Total player: `{total_players}`")
             yield event.plain_result("\n".join(output))
 
         except Exception as e:
-            logger.error(f"运行报错: {e}")
-            yield event.plain_result(f"查询出错: {str(e)}")
+            logger.error(f"Runtime error: {e}")
+            yield event.plain_result(f"Query error: {str(e)}")
 
     def _fetch_server_list(self):
         conn = None
@@ -96,11 +105,11 @@ class CS2StatusPlugin(Star):
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
             # 简洁格式：名称 |=> 地图 (人数/上限) IP:端口
-            line = f"{name} `{info.map_name}`\n(`{info.player_count} / {info.max_players})` `{host}:{port}`"
+            line = f"{name} `{info.map_name}`\n└`({info.player_count}/{info.max_players})` `{host}:{port}`"
             return {"group": group, "line": line, "player_count": info.player_count}
         except Exception:
-            line = f"{name} 查询超时\n`(0 / 0)` `{host}:{port}`"
+            line = f"{name} Query timeout\n└`(0/0)` `{host}:{port}`"
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
-        logger.info("已卸载: astrbot_plugin_cs2_status")
+        logger.info("uninstalled: astrbot_plugin_cs2_status")
