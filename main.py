@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.1.0",
+    "1.1.1",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -31,9 +31,10 @@ class CS2StatusPlugin(Star):
     async def server_status(self, event: AstrMessageEvent):
         """Query Kep server information"""
 
-        yield event.plain_result("Querying server information...")
+        # 1. 发送初始消息并获取引用
+        loading_msg = await event.send(event.plain_result("Querying server information..."))
 
-        # 定义名字映射表
+        # 定义名字映射表 (保持原样)
         GROUP_MAP = {
             "ze_practice": "**__Single player practice map__**",
             "ze": "**__Play the map (No practice stripper)__**"
@@ -44,7 +45,8 @@ class CS2StatusPlugin(Star):
             rows = await asyncio.to_thread(self._fetch_server_list)
 
             if not rows:
-                yield event.plain_result("No enabled configuration in the database")
+                await event.bot.edit_message(loading_msg,
+                                             event.plain_result("No enabled configuration in the database"))
                 return
 
             # 2. 并行查询 A2S 接口
@@ -64,12 +66,9 @@ class CS2StatusPlugin(Star):
 
             # 4. 构建输出消息
             output = []
-            # 按照数据库原始 group_name 排序，但在显示时转换名称
             for group_key in sorted(grouped_data.keys(), reverse=True):
-                # --- 修改部分：转换显示名称 ---
                 display_name = GROUP_MAP.get(group_key, group_key)
                 output.append(f"↓ {display_name} ↓")
-                # ---------------------------
 
                 for res in grouped_data[group_key]:
                     output.append(res["line"])
@@ -77,11 +76,14 @@ class CS2StatusPlugin(Star):
                 output.append("")
 
             output.append(f"Total player: `{total_players}`")
-            yield event.plain_result("\n".join(output))
+
+            # 5. 【关键】编辑最初的那条消息，而不是发送新消息
+            await event.bot.edit_message(loading_msg, event.plain_result("\n".join(output)))
 
         except Exception as e:
             logger.error(f"Runtime error: {e}")
-            yield event.plain_result(f"Query error: {str(e)}")
+            # 出错时也更新原消息
+            await event.bot.edit_message(loading_msg, event.plain_result(f"Query error: {str(e)}"))
 
     def _fetch_server_list(self):
         conn = None
