@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.0.8",
+    "1.0.9",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -66,7 +66,7 @@ class CS2StatusPlugin(Star):
 
                 output.append("")  # 组间空行
 
-            output.append(f"总在线人数: {total_players}")
+            output.append(f"总在线人数: `{total_players}`")
 
             yield event.plain_result("\n".join(output))
 
@@ -96,10 +96,10 @@ class CS2StatusPlugin(Star):
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
             # 简洁格式：名称 |=> 地图 (人数/上限) IP:端口
-            line = f"{name} |=> {info.map_name}\n({info.player_count} / {info.max_players}) {host}:{port}"
+            line = f"{name} `{info.map_name}`\n(`{info.player_count} / {info.max_players})` `{host}:{port}`"
             return {"group": group, "line": line, "player_count": info.player_count}
         except Exception:
-            line = f"{name} |=> 查询超时\n(0 / 0) {host}:{port}"
+            line = f"{name} 查询超时\n`(0 / 0)` `{host}:{port}`"
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
