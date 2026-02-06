@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.1.6",
+    "1.1.7",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -96,7 +96,7 @@ class CS2StatusPlugin(Star):
             conn = self._get_db_conn()
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
-                "SELECT name, host, port, group_name FROM servers WHERE is_active = 1 ORDER BY group_name DESC"
+                "SELECT name, host, port, mode FROM servers WHERE is_active = 1 ORDER BY mode DESC"
             )
             rows = cursor.fetchall()
             cursor.close()
@@ -107,7 +107,7 @@ class CS2StatusPlugin(Star):
 
     async def _query_a2s(self, s):
         host, port = s["host"], s["port"]
-        name, group = s["name"], s["group_name"]
+        name, group = s["name"], s["mode"]
         try:
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
