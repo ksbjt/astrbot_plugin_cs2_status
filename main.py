@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.1.9",
+    "1.2.0",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -111,10 +111,10 @@ class CS2StatusPlugin(Star):
         try:
             # 增加超时控制
             info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-            line = f"· {name} [ {info.player_count} / {info.max_players} ]\nMap: **{info.map_name}**\n__connect {host}:{port}__"
+            line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__connect {host}:{port}__"
             return {"group": group, "line": line, "player_count": info.player_count}
         except Exception:
-            line = f"· {name} [ 0 / 0 ]\nError: **QueryTimeout**"
+            line = f"· {name} TimeoutError\n__connect {host}:{port}__"
             return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
