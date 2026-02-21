@@ -1,4 +1,5 @@
 import asyncio
+import socket
 import mysql.connector
 import a2s
 from astrbot.api.event import filter, AstrMessageEvent
@@ -10,7 +11,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.0",
+    "1.2.1",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -108,14 +109,22 @@ class CS2StatusPlugin(Star):
     async def _query_a2s(self, s):
         host, port = s["host"], s["port"]
         name, group = s["name"], s["mode"]
-        try:
-            # 增加超时控制
-            info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-            line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__connect {host}:{port}__"
-            return {"group": group, "line": line, "player_count": info.player_count}
-        except Exception:
-            line = f"· {name} TimeoutError\n__connect {host}:{port}__"
-            return {"group": group, "line": line, "player_count": 0}
+        timeout_errors = (TimeoutError, asyncio.TimeoutError, socket.timeout)
+        for attempt in range(2):
+            try:
+                # 增加超时控制：首次超时时自动重试一次，减少网络抖动影响
+                info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
+                line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__connect {host}:{port}__"
+                return {"group": group, "line": line, "player_count": info.player_count}
+            except timeout_errors as e:
+                if attempt == 0:
+                    logger.warning(f"A2S query timeout, retry once: {host}:{port}, error={e}")
+                    continue
+                line = f"· {name} TimeoutError\n__connect {host}:{port}__"
+                return {"group": group, "line": line, "player_count": 0}
+            except Exception:
+                line = f"· {name} TimeoutError\n__connect {host}:{port}__"
+                return {"group": group, "line": line, "player_count": 0}
 
     async def terminate(self):
         logger.info("uninstalled: astrbot_plugin_cs2_status")
