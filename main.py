@@ -11,7 +11,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.1",
+    "1.2.2",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -52,6 +52,21 @@ class CS2StatusPlugin(Star):
             tasks = [self._query_a2s(s) for s in rows]
             results = await asyncio.gather(*tasks)
 
+            # 全部查询超时时，输出统一英文提示
+            all_failed = len(results) > 0 and all(res.get("timed_out", False) for res in results)
+            if all_failed and len(rows) > 0:
+                if loading_msg:
+                    await loading_msg.edit(
+                        event.plain_result(
+                            "All servers timed out.\nPossible network instability or the game is being updated/under maintenance."
+                        )
+                    )
+                else:
+                    yield event.plain_result(
+                        "All servers timed out.\nPossible network instability or the game is being updated/under maintenance."
+                    )
+                return
+
             # 3. 按组组织数据
             grouped_data = {}
             total_players = 0
@@ -75,6 +90,11 @@ class CS2StatusPlugin(Star):
                 output.append("")
 
             output.append(f"Total player: **{total_players}**")
+            hidden_non_idle_count = sum(
+                1 for res in results if (not res.get("timed_out", False)) and res["player_count"] > 0
+            )
+            if hidden_non_idle_count > 0:
+                output.append("Non-idle servers are hidden")
             final_text = "\n".join(output)
 
             # 5. 【核心修改】使用返回对象的 edit 方法进行原地覆盖
@@ -110,21 +130,24 @@ class CS2StatusPlugin(Star):
         host, port = s["host"], s["port"]
         name, group = s["name"], s["mode"]
         timeout_errors = (TimeoutError, asyncio.TimeoutError, socket.timeout)
-        for attempt in range(2):
+        max_retries = 2
+        for attempt in range(max_retries + 1):
             try:
-                # 增加超时控制：首次超时时自动重试一次，减少网络抖动影响
+                # 增加超时控制：超时后最多重试两次，减少网络抖动影响
                 info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
                 line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": info.player_count}
+                return {"group": group, "line": line, "player_count": info.player_count, "timed_out": False}
             except timeout_errors as e:
-                if attempt == 0:
-                    logger.warning(f"A2S query timeout, retry once: {host}:{port}, error={e}")
+                if attempt < max_retries:
+                    logger.warning(
+                        f"A2S query timeout, retry {attempt + 1}/{max_retries}: {host}:{port}, error={e}"
+                    )
                     continue
                 line = f"· {name} TimeoutError\n__connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": 0}
+                return {"group": group, "line": line, "player_count": 0, "timed_out": True}
             except Exception:
                 line = f"· {name} TimeoutError\n__connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": 0}
+                return {"group": group, "line": line, "player_count": 0, "timed_out": True}
 
     async def terminate(self):
         logger.info("uninstalled: astrbot_plugin_cs2_status")
