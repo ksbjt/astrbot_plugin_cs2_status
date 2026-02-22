@@ -11,7 +11,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.3",
+    "1.2.4",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -35,8 +35,8 @@ class CS2StatusPlugin(Star):
         loading_msg = await event.send(event.plain_result("Querying server information..."))
 
         GROUP_MAP = {
-            "ze_practice": "**__Practice map__**",
-            "ze": "**__Play map (No practice stripper)__**"
+            "ze_practice": "Practice map",
+            "ze": "Play map (No practice stripper)",
         }
 
         try:
@@ -88,7 +88,7 @@ class CS2StatusPlugin(Star):
 
             for group_key in sorted(grouped_data.keys(), reverse=True):
                 display_name = GROUP_MAP.get(group_key, group_key)
-                output.append(f"{display_name}")
+                output.append(f"📡 **{display_name}** 📡")
                 for res in grouped_data[group_key]:
                     output.append(res["line"])
                 output.append("")
@@ -136,7 +136,7 @@ class CS2StatusPlugin(Star):
             try:
                 # 增加超时控制：超时后最多重试两次，减少网络抖动影响
                 info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-                line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__connect {host}:{port}__"
+                line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__Connect {host}:{port}__"
                 return {"group": group, "line": line, "player_count": info.player_count, "timed_out": False}
             except timeout_errors as e:
                 if attempt < max_retries:
