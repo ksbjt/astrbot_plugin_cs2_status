@@ -11,7 +11,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.4",
+    "1.2.5",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -30,13 +30,15 @@ class CS2StatusPlugin(Star):
 
     @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
-        """Query kep server info"""
+        """Query kep server list"""
 
-        loading_msg = await event.send(event.plain_result("Querying server information..."))
+        loading_msg = await event.send(
+            event.plain_result("Querying server information...")
+        )
 
         GROUP_MAP = {
             "ze_practice": "Practice map",
-            "ze": "Play map (No practice stripper)",
+            "ze": "Play map (no practice stp)",
         }
 
         try:
@@ -45,7 +47,9 @@ class CS2StatusPlugin(Star):
 
             if not rows:
                 if loading_msg:
-                    await loading_msg.edit(event.plain_result("No enabled configuration in the database"))
+                    await loading_msg.edit(
+                        event.plain_result("No enabled configuration in the database")
+                    )
                 return
 
             # 2. 并行查询 A2S 接口
@@ -53,7 +57,9 @@ class CS2StatusPlugin(Star):
             results = await asyncio.gather(*tasks)
 
             # 全部查询超时时，输出统一英文提示
-            all_failed = len(results) > 0 and all(res.get("timed_out", False) for res in results)
+            all_failed = len(results) > 0 and all(
+                res.get("timed_out", False) for res in results
+            )
             if all_failed and len(rows) > 0:
                 if loading_msg:
                     await loading_msg.edit(
@@ -137,18 +143,33 @@ class CS2StatusPlugin(Star):
                 # 增加超时控制：超时后最多重试两次，减少网络抖动影响
                 info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
                 line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__Connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": info.player_count, "timed_out": False}
+                return {
+                    "group": group,
+                    "line": line,
+                    "player_count": info.player_count,
+                    "timed_out": False,
+                }
             except timeout_errors as e:
                 if attempt < max_retries:
                     logger.warning(
                         f"A2S query timeout, retry {attempt + 1}/{max_retries}: {host}:{port}, error={e}"
                     )
                     continue
-                line = f"· {name} TimeoutError\n__connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": 0, "timed_out": True}
+                line = f"· {name} TimeoutError\n__Connect {host}:{port}__"
+                return {
+                    "group": group,
+                    "line": line,
+                    "player_count": 0,
+                    "timed_out": True,
+                }
             except Exception:
-                line = f"· {name} TimeoutError\n__connect {host}:{port}__"
-                return {"group": group, "line": line, "player_count": 0, "timed_out": True}
+                line = f"· {name} TimeoutError\n__Connect {host}:{port}__"
+                return {
+                    "group": group,
+                    "line": line,
+                    "player_count": 0,
+                    "timed_out": True,
+                }
 
     async def terminate(self):
         logger.info("uninstalled: astrbot_plugin_cs2_status")
