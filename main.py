@@ -11,7 +11,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.2",
+    "1.2.3",
 )
 class CS2StatusPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -67,13 +67,17 @@ class CS2StatusPlugin(Star):
                     )
                 return
 
-            # 3. 按组组织数据
+            # 3. 按组组织数据（隐藏非空闲服务器）
             grouped_data = {}
             total_players = 0
+            hidden_non_idle_count = 0
 
             for res in results:
-                group = res["group"]
                 total_players += res["player_count"]
+                if (not res.get("timed_out", False)) and res["player_count"] > 0:
+                    hidden_non_idle_count += 1
+                    continue
+                group = res["group"]
                 if group not in grouped_data:
                     grouped_data[group] = []
                 grouped_data[group].append(res)
@@ -90,9 +94,6 @@ class CS2StatusPlugin(Star):
                 output.append("")
 
             output.append(f"Total player: **{total_players}**")
-            hidden_non_idle_count = sum(
-                1 for res in results if (not res.get("timed_out", False)) and res["player_count"] > 0
-            )
             if hidden_non_idle_count > 0:
                 output.append("Non-idle servers are hidden")
             final_text = "\n".join(output)
