@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.3",
+    "1.3.4",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -122,11 +122,11 @@ class CS2StatusPlugin(Star):
             line = (
                 f"· {name} ( {player_count} / {max_players if max_players is not None else '?'} )\n"
                 f"Map: **{map_name}**\n"
-                f"Join: [{host}:{port}](steam://connect/{host}:{port})"
+                f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
             )
         else:
             detail = api_error or status or "UnknownError"
-            line = f"· {name} TimeoutError ({detail})\n__Connect {host}:{port}__"
+            line = f"· {name} TimeoutError ({detail})\nJoin: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
 
         return {
             "group": group,
