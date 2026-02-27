@@ -10,14 +10,13 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.6",
+    "1.2.7",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
 
-    def __init__(self, context: Context, config: dict):
+    def __init__(self, context: Context):
         super().__init__(context)
-        self.config = config if config else context.config
 
     @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
@@ -113,8 +112,10 @@ class CS2StatusPlugin(Star):
                 yield event.plain_result(f"Query error: {str(e)}")
 
     def _fetch_server_list(self):
-        url = self.config.get("serverlist_url", self.SERVERLIST_URL)
-        req = request.Request(url=url, headers={"User-Agent": "astrbot-cs2-status/1.2.5"})
+        req = request.Request(
+            url=self.SERVERLIST_URL,
+            headers={"User-Agent": "astrbot-cs2-status/1.2.6"},
+        )
         try:
             with request.urlopen(req, timeout=5) as resp:
                 data = resp.read().decode("utf-8")
