@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.7",
+    "1.2.8",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -28,14 +28,13 @@ class CS2StatusPlugin(Star):
 
         GROUP_MAP = {
             "ze_practice": "Practice map",
-            "ze": "Play map (no practice stp)",
+            "ze": "Play map",
         }
 
         try:
             # 1. 异步拉取 API 服务器列表
             payload = await asyncio.to_thread(self._fetch_server_list)
             rows = payload.get("servers", [])
-            updated_at = payload.get("updated_at")
 
             if not rows:
                 if loading_msg:
@@ -82,12 +81,10 @@ class CS2StatusPlugin(Star):
             # 4. 构建输出消息
             output = []
             output.append("Kep Server List")
-            if updated_at:
-                output.append(f"Updated at: `{updated_at}`")
 
             for group_key in sorted(grouped_data.keys(), reverse=True):
                 display_name = GROUP_MAP.get(group_key, group_key)
-                output.append(f"📡 **{display_name}** 📡")
+                output.append(f"🎮 **{display_name}** 🎮")
                 for res in grouped_data[group_key]:
                     output.append(res["line"])
                 output.append("")
@@ -167,4 +164,4 @@ class CS2StatusPlugin(Star):
         }
 
     async def terminate(self):
-        logger.info("uninstalled: astrbot_plugin_cs2_status")
+        logger.info("卸载插件: astrbot_plugin_cs2_status")
