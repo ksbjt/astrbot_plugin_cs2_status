@@ -140,12 +140,12 @@ class CS2StatusPlugin(Star):
             status_text = status or "unknown"
             if api_error:
                 line = (
-                    f"· {name} {status_text} ({api_error})\n"
+                    f"· {name} ( {status_text} ) ({api_error})\n"
                     f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
                 )
             else:
                 line = (
-                    f"· {name} {status_text}\n"
+                    f"· {name} ( {status_text} )\n"
                     f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
                 )
 
