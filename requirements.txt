@@ -1,2 +1,0 @@
-python-a2s
-mysql-connector-python

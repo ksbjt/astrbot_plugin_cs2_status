@@ -1,7 +1,6 @@
 import asyncio
-import socket
-import mysql.connector
-import a2s
+import json
+from urllib import error, request
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
@@ -11,22 +10,14 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.5",
+    "1.2.6",
 )
 class CS2StatusPlugin(Star):
+    SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
+
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.config = config if config else context.config
-
-    def _get_db_conn(self):
-        return mysql.connector.connect(
-            host=self.config.get("db_host", "127.0.0.1"),
-            port=int(self.config.get("db_port", 3306)),
-            user=self.config.get("db_user", "root"),
-            password=self.config.get("db_pass", ""),
-            database=self.config.get("db_name", "cs2_serverlist"),
-            connect_timeout=5,
-        )
 
     @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
@@ -42,21 +33,22 @@ class CS2StatusPlugin(Star):
         }
 
         try:
-            # 1. 异步获取数据库服务器列表
-            rows = await asyncio.to_thread(self._fetch_server_list)
+            # 1. 异步拉取 API 服务器列表
+            payload = await asyncio.to_thread(self._fetch_server_list)
+            rows = payload.get("servers", [])
+            updated_at = payload.get("updated_at")
 
             if not rows:
                 if loading_msg:
                     await loading_msg.edit(
-                        event.plain_result("No enabled configuration in the database")
+                        event.plain_result("No server data from API")
                     )
                 return
 
-            # 2. 并行查询 A2S 接口
-            tasks = [self._query_a2s(s) for s in rows]
-            results = await asyncio.gather(*tasks)
+            # 2. 直接使用 API 返回状态
+            results = [self._build_result(s) for s in rows]
 
-            # 全部查询超时时，输出统一英文提示
+            # 全部超时时，输出统一英文提示
             all_failed = len(results) > 0 and all(
                 res.get("timed_out", False) for res in results
             )
@@ -91,6 +83,8 @@ class CS2StatusPlugin(Star):
             # 4. 构建输出消息
             output = []
             output.append("Kep Server List")
+            if updated_at:
+                output.append(f"Updated at: `{updated_at}`")
 
             for group_key in sorted(grouped_data.keys(), reverse=True):
                 display_name = GROUP_MAP.get(group_key, group_key)
@@ -119,57 +113,57 @@ class CS2StatusPlugin(Star):
                 yield event.plain_result(f"Query error: {str(e)}")
 
     def _fetch_server_list(self):
-        conn = None
+        url = self.config.get("serverlist_url", self.SERVERLIST_URL)
+        req = request.Request(url=url, headers={"User-Agent": "astrbot-cs2-status/1.2.5"})
         try:
-            conn = self._get_db_conn()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                "SELECT name, host, port, mode FROM servers WHERE is_active = 1 ORDER BY mode DESC"
-            )
-            rows = cursor.fetchall()
-            cursor.close()
-            return rows
-        finally:
-            if conn and conn.is_connected():
-                conn.close()
+            with request.urlopen(req, timeout=5) as resp:
+                data = resp.read().decode("utf-8")
+        except error.URLError as e:
+            raise RuntimeError(f"Failed to fetch API: {e}") from e
 
-    async def _query_a2s(self, s):
-        host, port = s["host"], s["port"]
-        name, group = s["name"], s["mode"]
-        timeout_errors = (TimeoutError, asyncio.TimeoutError, socket.timeout)
-        max_retries = 2
-        for attempt in range(max_retries + 1):
-            try:
-                # 增加超时控制：超时后最多重试两次，减少网络抖动影响
-                info = await asyncio.to_thread(a2s.info, (host, port), timeout=2.0)
-                line = f"· {name} ( {info.player_count} / {info.max_players} )\nMap: **{info.map_name}**\n__Connect {host}:{port}__"
-                return {
-                    "group": group,
-                    "line": line,
-                    "player_count": info.player_count,
-                    "timed_out": False,
-                }
-            except timeout_errors as e:
-                if attempt < max_retries:
-                    logger.warning(
-                        f"A2S query timeout, retry {attempt + 1}/{max_retries}: {host}:{port}, error={e}"
-                    )
-                    continue
-                line = f"· {name} TimeoutError\n__Connect {host}:{port}__"
-                return {
-                    "group": group,
-                    "line": line,
-                    "player_count": 0,
-                    "timed_out": True,
-                }
-            except Exception:
-                line = f"· {name} TimeoutError\n__Connect {host}:{port}__"
-                return {
-                    "group": group,
-                    "line": line,
-                    "player_count": 0,
-                    "timed_out": True,
-                }
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid API JSON: {e}") from e
+
+        if not isinstance(payload, dict):
+            raise RuntimeError("Invalid API response: root should be an object")
+        if "servers" not in payload or not isinstance(payload["servers"], list):
+            raise RuntimeError("Invalid API response: missing servers array")
+
+        return payload
+
+    def _build_result(self, server):
+        name = server.get("name", "Unknown")
+        host = server.get("host", "0.0.0.0")
+        port = server.get("port", 0)
+        group = server.get("mode", "other")
+        status = str(server.get("status", "")).lower()
+        api_error = server.get("error")
+
+        current_players = server.get("current_players")
+        max_players = server.get("max_players")
+        map_name = server.get("map") or "Unknown"
+
+        player_count = current_players if isinstance(current_players, int) else 0
+        is_ok = status == "ok"
+
+        if is_ok:
+            line = (
+                f"· {name} ( {player_count} / {max_players if max_players is not None else '?'} )\n"
+                f"Map: **{map_name}**\n"
+                f"__Connect {host}:{port}__"
+            )
+        else:
+            detail = api_error or status or "UnknownError"
+            line = f"· {name} TimeoutError ({detail})\n__Connect {host}:{port}__"
+
+        return {
+            "group": group,
+            "line": line,
+            "player_count": player_count if is_ok else 0,
+            "timed_out": not is_ok,
+        }
 
     async def terminate(self):
         logger.info("uninstalled: astrbot_plugin_cs2_status")

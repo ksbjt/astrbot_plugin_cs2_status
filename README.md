@@ -6,31 +6,17 @@
 
 ---
 
-### 新增数据
+### 数据来源
 
-```mysql
-CREATE DATABASE IF NOT EXISTS cs2_serverlist CHARACTER SET utf8mb4;
-```
+- 插件通过 HTTP API 获取服务器状态，不再依赖 MySQL。
+- 可通过配置项 `serverlist_url` 覆盖默认地址。
 
-``` mysql
-USE cs2_serverlist;
-```
+### API 返回示例
 
-``` mysql
-CREATE TABLE IF NOT EXISTS `servers` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `name` VARCHAR(100) NOT NULL COMMENT '显示名称',
-    `host` VARCHAR(50) NOT NULL COMMENT 'IP地址',
-    `port` INT NOT NULL COMMENT '查询端口',
-    `mode` VARCHAR(50) DEFAULT '其他' COMMENT '分组名称',
-    `rcon_pwd` VARCHAR(100) DEFAULT '' COMMENT 'RCON密码',
-    `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否启用: 1启用, 0禁用'
-);
-```
-
-``` mysql
-INSERT INTO servers (name, host, port, mode, is_active) VALUES 
-('01#', 'ip', port, 'mode', 1),
-('02#', 'ip', port, 'mode', 1),
-('03#', 'ip', port, 'mode', 1);
+```json
+{
+  "updated_at": "2026-02-27 08:43:13",
+  "last_error": null,
+  "servers": []
+}
 ```
