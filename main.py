@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.2.8",
+    "1.2.9",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -80,11 +80,11 @@ class CS2StatusPlugin(Star):
 
             # 4. 构建输出消息
             output = []
-            output.append("Kep Server List")
+            output.append("Kep ServerList")
 
             for group_key in sorted(grouped_data.keys(), reverse=True):
                 display_name = GROUP_MAP.get(group_key, group_key)
-                output.append(f"🎮 **{display_name}** 🎮")
+                output.append(f"**▶ {display_name} ◀**")
                 for res in grouped_data[group_key]:
                     output.append(res["line"])
                 output.append("")
