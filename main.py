@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.5",
+    "1.3.6",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -127,7 +127,9 @@ class CS2StatusPlugin(Star):
             if type(current_players) is int and current_players >= 0
             else 0
         )
-        max_count = max_players if type(max_players) is int and max_players >= 0 else "?"
+        max_count = (
+            max_players if type(max_players) is int and max_players >= 0 else "?"
+        )
         is_ok = status == "ok"
 
         if is_ok:
