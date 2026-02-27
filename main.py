@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.2",
+    "1.3.3",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -71,7 +71,6 @@ class CS2StatusPlugin(Star):
                 output.append("")
 
             output.append(f"Total player: **{total_players}**")
-            output.append(f"[Test](https://baidu.com)")
             if hidden_non_idle_count > 0:
                 output.append("__Non idle server hidden__")
             final_text = "\n".join(output)
@@ -123,7 +122,7 @@ class CS2StatusPlugin(Star):
             line = (
                 f"· {name} ( {player_count} / {max_players if max_players is not None else '?'} )\n"
                 f"Map: **{map_name}**\n"
-                f"__Connect {host}:{port}__"
+                f"Join: [{host}:{port}](steam://connect/{host}:{port})"
             )
         else:
             detail = api_error or status or "UnknownError"
