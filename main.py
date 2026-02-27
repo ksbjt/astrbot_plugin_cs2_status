@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.4",
+    "1.3.5",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -23,8 +23,12 @@ class CS2StatusPlugin(Star):
         """Query Kep ServerList"""
 
         GROUP_MAP = {
-            "ze_practice": "Practice map",
             "ze": "Play map",
+            "ze_practice": "Practice map",
+        }
+        GROUP_ORDER = {
+            "ze": 0,
+            "ze_practice": 1,
         }
 
         try:
@@ -32,17 +36,17 @@ class CS2StatusPlugin(Star):
             rows = payload.get("servers", [])
 
             if not rows:
-                yield event.plain_result("No server data from Api")
+                yield event.plain_result("No server data from API")
                 return
 
             results = [self._build_result(s) for s in rows]
 
-            all_failed = len(results) > 0 and all(
-                res.get("timed_out", False) for res in results
+            all_unavailable = results and all(
+                res.get("is_unavailable", False) for res in results
             )
-            if all_failed and len(rows) > 0:
+            if all_unavailable:
                 yield event.plain_result(
-                    "All servers timed out\nOr being updated/maintained"
+                    "All servers unavailable\nOr being updated/maintained"
                 )
                 return
 
@@ -52,7 +56,7 @@ class CS2StatusPlugin(Star):
 
             for res in results:
                 total_players += res["player_count"]
-                if (not res.get("timed_out", False)) and res["player_count"] > 0:
+                if (not res.get("is_unavailable", False)) and res["player_count"] > 0:
                     hidden_non_idle_count += 1
                     continue
                 group = res["group"]
@@ -63,7 +67,10 @@ class CS2StatusPlugin(Star):
             output = []
             output.append("Kep ServerList")
 
-            for group_key in sorted(grouped_data.keys(), reverse=True):
+            for group_key in sorted(
+                grouped_data.keys(),
+                key=lambda k: (GROUP_ORDER.get(k, 99), k),
+            ):
                 display_name = GROUP_MAP.get(group_key, group_key)
                 output.append(f"**--- {display_name} ---**")
                 for res in grouped_data[group_key]:
@@ -77,7 +84,7 @@ class CS2StatusPlugin(Star):
             yield event.plain_result(final_text)
 
         except Exception as e:
-            logger.error(f"Runtime error: {e}")
+            logger.exception(f"Runtime error: {e}")
             yield event.plain_result(f"Query error: {str(e)}")
 
     def _fetch_server_list(self):
@@ -108,31 +115,45 @@ class CS2StatusPlugin(Star):
         host = server.get("host", "0.0.0.0")
         port = server.get("port", 0)
         group = server.get("mode", "other")
-        status = str(server.get("status", "")).lower()
+        status = str(server.get("status", "")).strip().lower()
         api_error = server.get("error")
 
         current_players = server.get("current_players")
         max_players = server.get("max_players")
         map_name = server.get("map") or "Unknown"
 
-        player_count = current_players if isinstance(current_players, int) else 0
+        player_count = (
+            current_players
+            if type(current_players) is int and current_players >= 0
+            else 0
+        )
+        max_count = max_players if type(max_players) is int and max_players >= 0 else "?"
         is_ok = status == "ok"
 
         if is_ok:
             line = (
-                f"· {name} ( {player_count} / {max_players if max_players is not None else '?'} )\n"
+                f"· {name} ( {player_count} / {max_count} )\n"
                 f"Map: **{map_name}**\n"
                 f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
             )
         else:
-            detail = api_error or status or "UnknownError"
-            line = f"· {name} TimeoutError ({detail})\nJoin: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
+            status_text = status or "unknown"
+            if api_error:
+                line = (
+                    f"· {name} {status_text} ({api_error})\n"
+                    f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
+                )
+            else:
+                line = (
+                    f"· {name} {status_text}\n"
+                    f"Join: [{host}:{port}](https://vauff.com/connect.php?ip={host}:{port})"
+                )
 
         return {
             "group": group,
             "line": line,
             "player_count": player_count if is_ok else 0,
-            "timed_out": not is_ok,
+            "is_unavailable": not is_ok,
         }
 
     async def terminate(self):
