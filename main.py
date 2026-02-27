@@ -10,7 +10,7 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.0",
+    "1.3.1",
 )
 class CS2StatusPlugin(Star):
     SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
@@ -20,11 +20,7 @@ class CS2StatusPlugin(Star):
 
     @filter.command("status")
     async def server_status(self, event: AstrMessageEvent):
-        """Query kep server list"""
-
-        loading_msg = await event.send(
-            event.plain_result("Querying server information...")
-        )
+        """Query Kep ServerList"""
 
         GROUP_MAP = {
             "ze_practice": "Practice map",
@@ -32,38 +28,24 @@ class CS2StatusPlugin(Star):
         }
 
         try:
-            # 1. 异步拉取 API 服务器列表
             payload = await asyncio.to_thread(self._fetch_server_list)
             rows = payload.get("servers", [])
 
             if not rows:
-                if loading_msg:
-                    await loading_msg.edit(
-                        event.plain_result("No server data from API")
-                    )
+                yield event.plain_result("No server data from Api")
                 return
 
-            # 2. 直接使用 API 返回状态
             results = [self._build_result(s) for s in rows]
 
-            # 全部超时时，输出统一英文提示
             all_failed = len(results) > 0 and all(
                 res.get("timed_out", False) for res in results
             )
             if all_failed and len(rows) > 0:
-                if loading_msg:
-                    await loading_msg.edit(
-                        event.plain_result(
-                            "All servers timed out.\nPossible network instability or the game is being updated/under maintenance."
-                        )
-                    )
-                else:
-                    yield event.plain_result(
-                        "All servers timed out.\nPossible network instability or the game is being updated/under maintenance."
-                    )
+                yield event.plain_result(
+                    "All servers timed out\nOr being updated/maintained"
+                )
                 return
 
-            # 3. 按组组织数据（隐藏非空闲服务器）
             grouped_data = {}
             total_players = 0
             hidden_non_idle_count = 0
@@ -78,7 +60,6 @@ class CS2StatusPlugin(Star):
                     grouped_data[group] = []
                 grouped_data[group].append(res)
 
-            # 4. 构建输出消息
             output = []
             output.append("Kep ServerList")
 
@@ -91,27 +72,18 @@ class CS2StatusPlugin(Star):
 
             output.append(f"Total player: **{total_players}**")
             if hidden_non_idle_count > 0:
-                output.append("Non-idle servers are hidden")
+                output.append("__Non idle server hidden__")
             final_text = "\n".join(output)
-
-            # 5. 【核心修改】使用返回对象的 edit 方法进行原地覆盖
-            if loading_msg:
-                await loading_msg.edit(event.plain_result(final_text))
-            else:
-                # 如果因为某种原因没拿到 loading_msg，则保底发送一条新消息
-                yield event.plain_result(final_text)
+            yield event.plain_result(final_text)
 
         except Exception as e:
             logger.error(f"Runtime error: {e}")
-            if loading_msg:
-                await loading_msg.edit(event.plain_result(f"Query error: {str(e)}"))
-            else:
-                yield event.plain_result(f"Query error: {str(e)}")
+            yield event.plain_result(f"Query error: {str(e)}")
 
     def _fetch_server_list(self):
         req = request.Request(
             url=self.SERVERLIST_URL,
-            headers={"User-Agent": "astrbot-cs2-status/1.2.6"},
+            headers={"User-Agent": "astrbot_plugin_cs2_status"},
         )
         try:
             with request.urlopen(req, timeout=5) as resp:
