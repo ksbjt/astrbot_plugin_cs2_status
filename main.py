@@ -10,10 +10,10 @@ from astrbot.api import logger
     "astrbot_plugin_cs2_status",
     "ksbjt",
     "查询 CS2 服务器信息",
-    "1.3.7",
+    "1.3.8",
 )
 class CS2StatusPlugin(Star):
-    SERVERLIST_URL = "https://kep.kaish.cn/api/serverlist?key=kaish"
+    SERVERLIST_URL = "https://kepapi.kaish.cn/api/serverlist?key=kaish"
 
     def __init__(self, context: Context):
         super().__init__(context)
